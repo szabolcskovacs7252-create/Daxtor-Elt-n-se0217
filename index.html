@@ -1,1 +1,307 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A titkos küldetés</title>
 
+<style>
+:root {
+  color-scheme: dark;
+  --panel: #141827;
+  --line: #303951;
+  --text: #f4f5fb;
+  --muted: #aab2c8;
+  --accent: #b9a4ff;
+  --good: #8ee0b1;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at top,#20213a,#090b14 58%);
+  color: var(--text);
+  font: 16px/1.55 system-ui,sans-serif;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+
+main { width: min(100%,650px); }
+
+.panel {
+  background: rgba(20,24,39,.95);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: clamp(22px,5vw,38px);
+  box-shadow: 0 24px 80px #0008;
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: .18em;
+  color: var(--accent);
+  font-size: .75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+h1 {
+  text-align: center;
+  font-size: clamp(2rem,7vw,3.2rem);
+  line-height: 1.1;
+  margin: 12px 0;
+}
+
+p { color: var(--muted); }
+.center { text-align: center; }
+
+.timer {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 26px 0;
+  flex-wrap: wrap;
+}
+
+.unit {
+  background: #0c1020;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 15px 12px;
+  min-width: 75px;
+  text-align: center;
+}
+
+.num {
+  font-size: clamp(1.8rem,6vw,2.5rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit small {
+  display: block;
+  color: var(--muted);
+  letter-spacing: .1em;
+}
+
+button {
+  border: 0;
+  border-radius: 12px;
+  padding: 13px 19px;
+  background: var(--accent);
+  color: #171326;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.actions button { min-width: 180px; }
+
+input {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #0c1020;
+  color: var(--text);
+  font: inherit;
+  margin-top: 8px;
+}
+
+.question {
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 17px;
+  margin: 15px 0;
+  background: #101526;
+}
+
+.question label {
+  display: block;
+  font-weight: 650;
+}
+
+.progress {
+  height: 7px;
+  background: #090d18;
+  border-radius: 9px;
+  overflow: hidden;
+  margin: 18px 0;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.envelope {
+  font-size: 5rem;
+  text-align: center;
+  margin: 18px 0;
+}
+
+.secret {
+  font-size: clamp(2.8rem,12vw,5rem);
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-align: center;
+  color: var(--good);
+  margin: 8px 0;
+}
+
+.note {
+  border-left: 3px solid var(--accent);
+  padding: 12px 15px;
+  background: #0d1221;
+  border-radius: 0 12px 12px 0;
+}
+
+.error {
+  color: #ff9b9b;
+  min-height: 1.5em;
+}
+
+.tiny {
+  font-size: .82rem;
+  color: var(--muted);
+}
+</style>
+</head>
+
+<body>
+<main>
+<section class="panel" id="app" aria-live="polite"></section>
+</main>
+
+<script>
+const FIRST_MS = 2*24*60*60*1000;
+const SECOND_MS = (16*24*60+2*60+19)*60*1000;
+const PASSCODE = "Daxtor443";
+const STORAGE_KEY = "secretMission_v2";
+
+const questions = [
+ {q:"Mi volt az első régi videóm címe?",a:"NE HIGGY NEKI"},
+ {q:"Mi volt a második videóm címe?",a:"NEM Ő POSZTOL"},
+ {q:"Mi volt a harmadik videóm címe?",a:"02;17"},
+ {q:"Mi volt az ismeretlen felhasználó neve?",a:"USER_0217"},
+ {q:"Mi volt az ismétlődő hang?",a:"NEM Ő HAGYTA ABBA . MI ÁLLÍTOTTUK LE"},
+ {q:"Mi volt a fő tulajdonos neve?",a:"OWNER_02"},
+ {q:"Ki próbált figyelmeztetni?",a:"USER_0217"}
+];
+
+const app = document.getElementById("app");
+
+function load() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function save(s) {
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(s));
+}
+
+let state = load();
+
+if (!state) {
+  state = {
+    stage: "wait1",
+    firstStarted: Date.now(),
+    answers: {},
+    secondStarted: null
+  };
+  save(state);
+}
+
+function fmt(ms) {
+  const t = Math.max(0,Math.floor(ms/1000));
+  return {
+    days: Math.floor(t/86400),
+    hours: Math.floor(t%86400/3600),
+    mins: Math.floor(t%3600/60),
+    secs: t%60
+  };
+}
+
+function timer(t) {
+  return `<div class="timer">
+    <div class="unit">
+      <div class="num">${String(t.days).padStart(2,"0")}</div>
+      <small>NAP</small>
+    </div>
+    <div class="unit">
+      <div class="num">${String(t.hours).padStart(2,"0")}</div>
+      <small>ÓRA</small>
+    </div>
+    <div class="unit">
+      <div class="num">${String(t.mins).padStart(2,"0")}</div>
+      <small>PERC</small>
+    </div>
+    <div class="unit">
+      <div class="num">${String(t.secs).padStart(2,"0")}</div>
+      <small>MP</small>
+    </div>
+  </div>`;
+}
+
+function shell(k,t,b) {
+  app.innerHTML = `<div class="kicker">${k}</div><h1>${t}</h1>${b}`;
+}
+
+function norm(s) {
+  return s.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .toLocaleUpperCase("hu-HU")
+    .replace(/\s+/g," ")
+    .trim();
+}
+
+function render() {
+
+  if (state.stage === "wait1") {
+    let left = FIRST_MS - (Date.now()-state.firstStarted);
+
+    if (left <= 0) {
+      state.stage = "quiz";
+      save(state);
+      render();
+      return;
+    }
+
+    shell(
+      "1. FÁZIS",
+      "A visszaszámlálás",
+      `<p class="center">Valami készül. Térj vissza, amikor a számláló lejár.</p>
+      ${timer(fmt(left))}
+      <p class="tiny center">A két napos számláló az első megnyitáskor indul ezen az eszközön.</p>`
+    );
+
+    setTimeout(render,250);
+    return;
+  }
+
+  if (state.stage === "quiz") {
+    let done = Object.keys(state.answers).length;
+
+    shell(
+      "2. FÁZIS",
+      "A titkos kvíz",
+      `<p class="center">Írd be a válaszokat. Mind a hét kérdésre helyesen kell válaszolni.</p>
+      <div class="progress"><span style="width:${done/questions.length*100}%"></span></div>
+      <p class="tiny center">${done} / 7 kérdés kitöltve</p>
+
+      <form id="quiz">
+        ${questions.map((q,i)=>`
+          <div class="question">
